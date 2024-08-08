@@ -23,67 +23,64 @@ Auto-Commit Watchdog is a Python script designed to monitor specified project di
 1. **Clone the Repository**
 
    ```bash
-   git clone https://github.com/yourusername/auto-commit-watchdog.git
+   git clone https://github.com/Darthph0enix7/Auto-Commit_Watchdog
    cd auto-commit-watchdog
+   ```
 
+2. **Install Required Python Packages**
 
-Install Required Python Packages
+    Create a virtual environment (optional but recommended) and install dependencies:
 
-Create a virtual environment (optional but recommended) and install dependencies:
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    pip install -r requirements.txt
+    ```
+3. **Initial Configuration**
+    Run the script manually to configure the projects directory:
 
-bash
-Code kopieren
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-Initial Configuration
+        ```bash
+        python watcher.py
+        ```
+    You will be prompted to enter the path to your projects directory. This path will be saved in the config.yaml file.
 
-Run the script manually to configure the projects directory:
+### Running the Script
 
-bash
-Code kopieren
-python watcher.py
-You will be prompted to enter the path to your projects directory. This path will be saved in the config.yaml file.
+1. **Run Silently in the Background**
 
-Running the Script
-Run Silently in the Background
+    Use the provided batch file to run the script silently:
 
-Use the provided batch file to run the script silently:
+        ```bash
+        .\run_watcher.bat
+        ```
+    This will start the script in the background, and it will log output to script_output.log.
 
-bash
-Code kopieren
-.\run_watcher.bat
-This will start the script in the background, and it will log output to script_output.log.
+2. **Add to Startup (Optional)**
 
-Add to Startup (Optional)
+    To run the script automatically on startup:
 
-To run the script automatically on startup:
+    Create a shortcut of run_watcher.bat.
+    Press Win + R, type shell:startup, and press Enter.
+    Move the shortcut to the Startup folder.
 
-Create a shortcut of run_watcher.bat.
-Press Win + R, type shell:startup, and press Enter.
-Move the shortcut to the Startup folder.
-Configuration
+### Configuration
+
 The configuration is stored in config.yaml. Here is an example configuration:
 
-yaml
-Code kopieren
-projects:
-  - "Project1"
-  - "Project2"
-  - "*"
-projects_dir: "C:/path/to/your/projects"
-projects: List of project directories to monitor. Use "*" to monitor all directories in the projects folder.
-projects_dir: Path to the main projects directory.
-Logging and Notifications
-Notifications: The script provides system notifications for important events (e.g., commit success, errors).
-Logging: All events are logged to notification_log.txt in the script's directory.
-Requirements
-See requirements.txt for the list of dependencies.
+    ```yaml
+    projects:
+    - "Project1"
+    - "Project2"
+    - "*"
+    projects_dir: "C:/path/to/your/projects"
+    ```
+- **projects**: List of project directories to monitor. Use "*" to monitor all directories in the projects folder.
+- **projects_dir**: Path to the main projects directory.
 
-makefile
-Code kopieren
-watchdog==2.1.6
-pyyaml==6.0
-plyer==2.0.0
-Contributing
-Contributions are welcome! Please fork the repository and submit pull requests.
+### Logging and Notifications
+
+- **Notifications**: The script provides system notifications for important events (e.g., commit success, errors).
+- **Logging**: All events are logged to notification_log.txt in the script's directory.
+
+### Contributing
+Contributions are welcome! Please fork the repository and submit pull requests. :)
