@@ -43,9 +43,8 @@ Auto-Commit Watchdog is a Python script designed to monitor specified project di
 3. **Initial Configuration**
     Run the script manually to configure the projects directory:
 
-        ```bash
         python watcher.py
-        ```
+
     You will be prompted to enter the path to your projects directory. This path will be saved in the config.yaml file.
 
 ### Running the Script
@@ -54,9 +53,8 @@ Auto-Commit Watchdog is a Python script designed to monitor specified project di
 
     Use the provided batch file to run the script silently:
 
-        ```bash
         .\run_watcher.bat
-        ```
+
     This will start the script in the background, and it will log output to script_output.log.
 
 2. **Add to Startup (Optional)**
@@ -64,7 +62,7 @@ Auto-Commit Watchdog is a Python script designed to monitor specified project di
     To run the script automatically on startup:
 
     Create a shortcut of run_watcher.bat.
-    Press Win + R, type shell:startup, and press Enter.
+    Press "Win + R", type *shell:startup*, and press Enter.
     Move the shortcut to the Startup folder.
 
 ### Configuration

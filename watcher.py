@@ -8,13 +8,15 @@ from datetime import datetime, timedelta
 from plyer import notification
 
 class ChangeHandler(FileSystemEventHandler):
-    def __init__(self, project_path, project_name, notification_callback):
+    def __init__(self, project_path, project_name, notification_callback, log_callback):
         self.project_path = project_path
         self.project_name = project_name
         self.notification_callback = notification_callback
+        self.log_callback = log_callback
         self.last_change_time = datetime.now()
-        self.commit_delay = timedelta(seconds=10)
+        self.commit_delay = timedelta(minutes=1)
         self.size_limit_mb = 150
+        self.retry_delay = timedelta(minutes=10)
 
         self.gitignore_patterns = self.read_gitignore()
 
@@ -38,8 +40,6 @@ class ChangeHandler(FileSystemEventHandler):
         else:
             if not self.is_ignored(event.src_path):
                 self.last_change_time = datetime.now()
-                self.notification_callback(f'Change detected in {self.project_name}: {event.src_path}')
-                log_notification(f'Change detected in {self.project_name}: {event.src_path}', notify=False)
 
     def check_and_commit(self):
         if datetime.now() - self.last_change_time >= self.commit_delay:
@@ -48,25 +48,26 @@ class ChangeHandler(FileSystemEventHandler):
     def commit_and_push(self):
         os.chdir(self.project_path)
         if not os.path.isfile('.gitignore'):
-            self.notification_callback(f'{self.project_name} is missing a .gitignore file. Please create one.')
             return
 
         total_size = self.get_total_size()
         if total_size > self.size_limit_mb * 1024 * 1024:
-            self.notification_callback(f'{self.project_name} exceeds size limit of {self.size_limit_mb} MB. Please reduce the size.')
+            self.log_callback(f'{self.project_name} exceeds size limit of {self.size_limit_mb} MB. Skipping.')
             return
 
         try:
-            log_notification(f'Starting commit and push for {self.project_name}', notify=False)
-            subprocess.call(['git', 'add', '.'])
+            self.log_callback(f'Starting commit and push for {self.project_name}')
             commit_message = f'Automated commit: {datetime.now().ctime()}'
-            subprocess.call(['git', 'commit', '-m', commit_message])
-            subprocess.call(['git', 'push', 'origin', 'main'])
+            subprocess.check_call(['git', 'add', '.'])
+            subprocess.check_call(['git', 'commit', '-m', commit_message])
+            subprocess.check_call(['git', 'push', 'origin', 'main'])
             self.notification_callback(f'{self.project_name} has been successfully committed and pushed.')
-            log_notification(f'Successfully committed and pushed {self.project_name} with message: "{commit_message}"', notify=False)
-        except Exception as e:
+            self.log_callback(f'Successfully committed and pushed {self.project_name} with message: "{commit_message}"')
+        except subprocess.CalledProcessError as e:
             self.notification_callback(f'Error in {self.project_name}: {str(e)}')
-            log_notification(f'Error in {self.project_name}: {str(e)}', notify=False)
+            self.log_callback(f'Error in {self.project_name}: {str(e)}. Retrying in {self.retry_delay.seconds // 60} minutes.')
+            time.sleep(self.retry_delay.seconds)  # Wait before retrying
+            self.check_and_commit()
 
     def get_total_size(self):
         total_size = 0
@@ -77,51 +78,52 @@ class ChangeHandler(FileSystemEventHandler):
                     total_size += os.path.getsize(fp)
         return total_size
 
-def monitor_projects(config_file, notification_callback):
-    log_notification("Starting to monitor projects", notification_callback)
+def monitor_projects(config_file, notification_callback, log_callback):
+    log_callback("Starting to monitor projects")
     with open(config_file, 'r') as file:
         config = yaml.safe_load(file)
 
     projects_dir = config.get('projects_dir', None)
+    project_names = config.get('projects', [])
+
     if not projects_dir:
         notification_callback("Projects directory is not configured. Please run the script manually to set it up.")
         return
 
-    observer = Observer()
-    handlers = []
+    while True:
+        observer = Observer()
+        handlers = []
 
-    for project_name in config['projects']:
-        if project_name == '*':
-            for dir_name in os.listdir(projects_dir):
-                project_path = os.path.join(projects_dir, dir_name)
-                if os.path.isdir(project_path) and os.path.isfile(os.path.join(project_path, '.gitignore')):
-                    handler = ChangeHandler(project_path, dir_name, notification_callback)
-                    observer.schedule(handler, path=project_path, recursive=True)
-                    handlers.append(handler)
-                    notification_callback(f'Monitoring project: {dir_name}')
-                    log_notification(f'Monitoring project: {dir_name}', notify=False)
-        else:
-            project_path = os.path.join(projects_dir, project_name)
-            if os.path.isdir(project_path) and os.path.isfile(os.path.join(project_path, '.gitignore')):
-                handler = ChangeHandler(project_path, project_name, notification_callback)
+        for dir_name in os.listdir(projects_dir):
+            project_path = os.path.join(projects_dir, dir_name)
+
+            # Check if we should monitor this project
+            should_monitor = (
+                '*' in project_names or
+                dir_name in project_names
+            )
+            if os.path.isdir(project_path) and os.path.isfile(os.path.join(project_path, '.gitignore')) and should_monitor:
+                handler = ChangeHandler(project_path, dir_name, notification_callback, log_callback)
                 observer.schedule(handler, path=project_path, recursive=True)
                 handlers.append(handler)
-                notification_callback(f'Monitoring project: {project_name}')
-                log_notification(f'Monitoring project: {project_name}', notify=False)
+                log_callback(f'Monitoring project: {dir_name}')
 
-    observer.start()
-    try:
-        notification_callback("Git automation script is now running.")
-        log_notification("Git automation script is now running", notify=False)
-        while True:
-            time.sleep(60)  # Check every minute
-            for handler in handlers:
-                handler.check_and_commit()
-    except KeyboardInterrupt:
-        observer.stop()
-    observer.join()
-    notification_callback("Git automation script has been stopped.")
-    log_notification("Git automation script has been stopped", notify=False)
+        observer.start()
+        try:
+            log_callback("Git automation script is now running.")
+            while True:
+                time.sleep(60)  # Check every minute
+                for handler in handlers:
+                    handler.check_and_commit()
+        except KeyboardInterrupt:
+            observer.stop()
+            break
+        except Exception as e:
+            log_callback(f"Unexpected error: {str(e)}. Restarting monitor.")
+            observer.stop()
+            time.sleep(10)
+            continue
+        observer.join()
 
 def log_notification(message, notify=True):
     # Save log in the same directory as the script, not in the project folders
@@ -168,4 +170,4 @@ if __name__ == "__main__":
         setup_projects_directory(config_file)
         log_notification("Projects directory has been configured. Please run the script again.")
     else:
-        monitor_projects(config_file, log_notification)
+        monitor_projects(config_file, log_notification, log_notification)
