@@ -13,7 +13,7 @@ class ChangeHandler(FileSystemEventHandler):
         self.project_name = project_name
         self.log_callback = log_callback
         self.last_change_time = None
-        self.commit_delay = timedelta(seconds=10)
+        self.commit_delay = timedelta(minutes=30)
         self.size_limit_mb = 150
         self.retry_delay = timedelta(minutes=10)
 
@@ -39,7 +39,6 @@ class ChangeHandler(FileSystemEventHandler):
         else:
             if not self.is_ignored(event.src_path):
                 self.last_change_time = datetime.now()
-                self.log_callback(f'Change detected in {self.project_name}: {event.src_path}')
 
     def check_and_commit(self):
         if self.last_change_time and datetime.now() - self.last_change_time >= self.commit_delay:
@@ -83,10 +82,11 @@ class ChangeHandler(FileSystemEventHandler):
         return total_size
 
 def monitor_projects(config_file, log_callback):
-    log_callback("Starting to monitor projects")
-    with open(config_file, 'r') as file:
-        config = yaml.safe_load(file)
+    def load_config():
+        with open(config_file, 'r') as file:
+            return yaml.safe_load(file)
 
+    config = load_config()
     projects_dir = config.get('projects_dir', None)
     project_names = config.get('projects', [])
 
@@ -97,27 +97,34 @@ def monitor_projects(config_file, log_callback):
     observer = Observer()
     handlers = []
 
-    for dir_name in os.listdir(projects_dir):
-        project_path = os.path.join(projects_dir, dir_name)
+    def update_monitoring():
+        nonlocal config, project_names
+        observer.unschedule_all()  # Unmonitor all existing paths
+        config = load_config()
+        project_names = config.get('projects', [])
+        for dir_name in os.listdir(projects_dir):
+            project_path = os.path.join(projects_dir, dir_name)
 
-        # Check if we should monitor this project
-        should_monitor = (
-            '*' in project_names or
-            dir_name in project_names
-        )
-        if os.path.isdir(project_path) and os.path.isfile(os.path.join(project_path, '.gitignore')) and should_monitor:
-            handler = ChangeHandler(project_path, dir_name, log_callback)
-            observer.schedule(handler, path=project_path, recursive=True)
-            handlers.append(handler)
-            log_callback(f'Monitoring project: {dir_name}')
+            # Check if we should monitor this project
+            should_monitor = (
+                '*' in project_names or
+                dir_name in project_names
+            )
+            if os.path.isdir(project_path) and os.path.isfile(os.path.join(project_path, '.gitignore')) and should_monitor:
+                handler = ChangeHandler(project_path, dir_name, log_callback)
+                observer.schedule(handler, path=project_path, recursive=True)
+                handlers.append(handler)
+                log_callback(f'Monitoring project: {dir_name}')
 
+    update_monitoring()  # Initial monitoring setup
     observer.start()
     log_callback("Git automation script is now running.")
     notify("Git automation script is now running.")
 
     try:
         while True:
-            time.sleep(60)  # Check every minute
+            time.sleep(300)  # Recheck config file every 5 minutes
+            update_monitoring()
             for handler in handlers:
                 handler.check_and_commit()
     except KeyboardInterrupt:
