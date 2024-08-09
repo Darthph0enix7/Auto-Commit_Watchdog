@@ -20,6 +20,10 @@ Auto-Commit Watchdog is a Python script designed to monitor specified project di
 
 ### Installation
 
+**Note:**
+- Ensure that you have initialized the GitHub repository beforehand and have set up your GitHub credentials. This script will only update the repository.
+- Currently, this program only monitors projects with a `.gitignore` file to avoid pushing large files and folders (e.g., datasets). Some manual setup is required to ensure proper functionality.
+
 1. **Clone the Repository**
 
    ```bash
